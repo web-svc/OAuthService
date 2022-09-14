@@ -1,0 +1,3 @@
+is_global = true
+build_property.RootNamespace = OAuthService
+build_property.ProjectDir = C:\git\OAuthService\OAuthService\

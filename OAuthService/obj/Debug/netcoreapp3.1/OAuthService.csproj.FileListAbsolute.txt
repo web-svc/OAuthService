@@ -1,0 +1,9 @@
+C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.GeneratedMSBuildEditorConfig.editorconfig
+C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.AssemblyInfoInputs.cache
+C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.AssemblyInfo.cs
+C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.csproj.CoreCompileInputs.cache
+C:\git\OAuthService\OAuthService\bin\Debug\netcoreapp3.1\OAuthService.deps.json
+C:\git\OAuthService\OAuthService\bin\Debug\netcoreapp3.1\OAuthService.dll
+C:\git\OAuthService\OAuthService\bin\Debug\netcoreapp3.1\OAuthService.pdb
+C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.dll
+C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.pdb

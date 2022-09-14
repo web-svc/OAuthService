@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "AzZNcwYAE7hEG/Eyiy6tJqFnUwECTvsCEFEo3nLRpcSQ8PWzg7B+GEVSlYJROj9LcR/wYCUnF/O+Pv+uWAVeuA==",
+  "success": true,
+  "projectFilePath": "C:\\git\\OAuthService\\OAuthService\\OAuthService.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\narender.kumar\\.nuget\\packages\\newtonsoft.json\\13.0.1\\newtonsoft.json.13.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}
