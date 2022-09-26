@@ -2,12 +2,32 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <PackageId>WebSvc.OAuthService</PackageId>
+    <Description>OAuthService is nuget package library to provide LogIn service for Facebook, Google, Microsoft, Twitter, Yahoo, Linked In.</Description>
+    <Authors>Narender Kumar</Authors>
+    <Company>Web Svc</Company>
+    <Product>Open Authrization Service</Product>
+    <Copyright>@Web Svc</Copyright>
+    <PackageLicenseFile>EULA.txt</PackageLicenseFile>
+    <PackageProjectUrl></PackageProjectUrl>
+    <RepositoryUrl>https://github.com/web-svc/OAuthService</RepositoryUrl>
+    <RepositoryType>public</RepositoryType>
+    <PackageTags>WebSvc, Web Svc, OAuthService, Open Auth Service, Login with Facebook, SignIn with Facebook, Login with Microsoft, SignIn with Microsoft, Login with Twitter, SignIn with Twitter, Login with LinkedIn, SignIn with LinkedIn, Login with Yahoo, SignIn with Yahoo, Login with Google, SignIn with Google</PackageTags>
+    <PackageReleaseNotes>OAuth - Login Service - easy to integrate the login with foloowing services
+Facebook, LinkedIn, Google, Facebook, Yahoo, Microsoft</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="WebSvc.CryptoService" Version="1.1.1" />
     <PackageReference Include="WebSvc.Helper" Version="1.1.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\EULA.txt">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
