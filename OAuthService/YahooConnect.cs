@@ -1,208 +1,125 @@
-﻿using Newtonsoft.Json;
-using OAuthService.Constant;
-using OAuthService.Extentsion;
-using OAuthService.Model;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Web;
-
-namespace OAuthService
+﻿namespace OAuthService
 {
+    using CryptoService;
+    using CryptoService.Interface;
+    using CryptoService.Model;
+    using Helper;
+    using Helper.Extentsion;
+    using Helper.Interface;
+    using Helper.Model;
+    using Newtonsoft.Json;
+    using Newtonsoft.Json.Linq;
+    using OAuthService.Interface;
+    using OAuthService.Interface.Yahoo;
+    using OAuthService.Model;
+    using OAuthService.Model.Yahoo;
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Specialized;
+    using System.Linq;
+    using System.Net;
+    using System.Net.Http;
+    using System.Threading.Tasks;
+    using System.Web;
+    using static OAuthService.Constant.Const;
+    using static OAuthService.Constant.Enum;
+
     public class YahooConnect
     {
         private readonly string _apiKey;
         private readonly string _apiSecret;
-        private string _callBackUrl;
+        private static string _callBackUrl;
+        private readonly string _scope;
         private string _authorizeUrl;
         private string _accessTockenUrl;
         private string _userJsonUrl;
         static NameValueCollection QueryString = HttpUtility.ParseQueryString(string.Empty);
-        public YahooConnect(string consumerKey, string consumerSecret, string authorizeUrl = "https://api.login.yahoo.com/oauth2/request_auth", string accessTockenUrl = "https://api.login.yahoo.com/oauth2/get_token", string userJsonUrl = "https://social.yahooapis.com/v1/user/{0}/profile?format=json")
+        readonly ITextService textService = new TextService();
+        readonly IUrlService urlService = new UrlService();
+        readonly IAuthService authService = new AuthService();
+
+        public YahooConnect(string consumerKey, string consumerSecret, string callbackUrl, string scope = "openid mail-r", string authorizeUrl = "https://api.login.yahoo.com/oauth2/request_auth", string accessTockenUrl = "https://api.login.yahoo.com/oauth2/get_token", string userJsonUrl = "https://api.login.yahoo.com/openid/v1/userinfo")
         {
             _apiKey = consumerKey;
             _apiSecret = consumerSecret;
+            _scope = scope;
             _authorizeUrl = authorizeUrl;
             _accessTockenUrl = accessTockenUrl;
             _userJsonUrl = userJsonUrl;
+            _callBackUrl = callbackUrl;
+            QueryString = HttpUtility.ParseQueryString(new Uri(_callBackUrl).Query);
         }
-        public static bool IsAuthorized => !QueryString["code"].IsEmpty();
-        public static bool IsDenied => !QueryString["error"].IsEmpty();
-        public void Authentication(string callBackUrl)
+        
+        public static bool IsAuthorized => !QueryString[AuthCode].IsEmpty();
+        
+        public static bool IsDenied => !QueryString[Error].IsEmpty();
+        
+        public string GetAuthenticationUrl()
         {
-            _callBackUrl = callBackUrl; //HttpContext.Current.Response.Redirect(AuthenticationUrl);
-        }
-        private string AuthenticationUrl
-        {
-            get
-            {
-                var uriBuilder = new UriBuilder(_authorizeUrl);
-                var queryString = HttpUtility.ParseQueryString(uriBuilder.Query);
-                App.XOAUTH_Guid = GenerateNonce();
-                //HttpContext.Current.Session.Add("csrf_state", App.XOAUTH_Guid);
-                var queryParameters = GetQueryParameters(uriBuilder.Query);
-                queryParameters.Add(new QueryParameter("client_id", _apiKey));
-                queryParameters.Add(new QueryParameter("redirect_uri", _callBackUrl));
-                queryParameters.Add(new QueryParameter("response_type", Const.ResponseType));
-                queryParameters.Add(new QueryParameter("state", App.XOAUTH_Guid));
-                uriBuilder.Query = NormalizeRequestParameters(queryParameters);
-                return uriBuilder.Uri.AbsoluteUri;
-            }
-        }
-        public void Authorize(string callBackUrl)
-        {
-            _callBackUrl = callBackUrl; AccessTokenGet(QueryString["code"], QueryString["state"]);
-            if (App.TokenSecret.Length <= 0)
-                throw new Exception("Invalid Twitter token.");
-        }
-        private void AccessTokenGet(string authToken, string oauthVerifier)
-        {
-            App.Token = authToken;
-            App.OAuthVerifier = oauthVerifier;
-            //if (HttpContext.Current.Session["csrf_state"] == null || !HttpContext.Current.Session["csrf_state"].Equals(oauthVerifier))
-            //    throw new Exception("auth data data has been tempered but you are safe.");
-            var uriBuilder = new UriBuilder(_accessTockenUrl);
-            var queryString = HttpUtility.ParseQueryString(uriBuilder.Query);
-            var queryParameters = GetQueryParameters(uriBuilder.Query);
-            queryParameters.Add(new QueryParameter("grant_type", Const.GrantType));
-            queryParameters.Add(new QueryParameter("redirect_uri", UrlEncode(_callBackUrl)));
-            queryParameters.Add(new QueryParameter("code", App.Token));
-            var query = NormalizeRequestParameters(queryParameters);
-            var AuthrizedData = JsonConvert.DeserializeObject<dynamic>(WebRequest(Method.POST, uriBuilder.Uri.AbsoluteUri, query));
-            App.TokenSecret = AuthrizedData["access_token"].ToString();
-            App.XOAUTH_Guid = AuthrizedData["xoauth_yahoo_guid"].ToString();
-        }
-        private string WebRequest(Method method, string url, string postData)
-        {
-            var webRequest = System.Net.WebRequest.Create(url) as HttpWebRequest;
-            if (webRequest == null) return null;
-            webRequest.Method = method.ToString();
-            webRequest.ServicePoint.Expect100Continue = false;
-            if (method == Method.POST || method == Method.DELETE)
-            {
-                webRequest.Headers.Add(AuthorizationHeader);
-                webRequest.ContentType = "application/x-www-form-urlencoded";
-                var streamWriter2 = new StreamWriter(webRequest.GetRequestStream());
-                try
-                {
-                    streamWriter2.Write(postData);
-                }
-                finally
-                {
-                    streamWriter2.Close();
-                }
-            }
-            var str = WebResponseGet(webRequest);
-            return str;
-        }
-        private string AuthorizationHeader
-        {
-            get
-            {
-                return "Authorization: Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(_apiKey + ":" + _apiSecret));
-            }
-        }
-        private string AuthorizedHeader
-        {
-            get
-            {
-                return "Authorization: Bearer " + App.TokenSecret;
-            }
-        }
-        public User FetchProfile()
-        {
-            var userJson = JsonConvert.DeserializeObject<dynamic>(GetAuthRequest(Method.GET, string.Format(_userJsonUrl, App.XOAUTH_Guid), AuthorizedHeader));
-            if (userJson == null) { throw new Exception("? OAuth Token not received. Please retry or get in touch with support team."); }
-            if (userJson["profile"].ContainsKey("emails") == false) { throw new Exception("we could not fetch your email address from OAuth Token. Please make sure that your profile is up to date with email address."); }
-            return new User { Email = userJson["profile"]["emails"][0]["handle"], Name = userJson["profile"]["givenName"] + " " + userJson["profile"]["familyName"], Token = App.TokenSecret, AuthRouter = "Yahoo" };
-        }
-        private static string GetAuthRequest(Method method, string url, string postData)
-        {
-            var webRequest = System.Net.WebRequest.Create(url) as HttpWebRequest;
-            if (webRequest == null) return null;
-            webRequest.Method = method.ToString();
-            if (postData.Length > 0)
-            {
-                webRequest.Headers.Add(postData);
-                webRequest.KeepAlive = true;
-            }
-            var str = WebResponseGet(webRequest);
-            return str;
-        }
-        private static string WebResponseGet(HttpWebRequest webRequest)
-        {
-            var stream = webRequest.GetResponse().GetResponseStream();
-            return stream == null ? null : new StreamReader(stream).ReadToEnd();
-        }
-        private enum Method
-        {
-            GET,
-            POST,
-            DELETE,
-        }
-        private static string UrlEncode(string value)
-        {
-            var stringBuilder = new StringBuilder();
-            foreach (var ch in value)
-            {
-                if (Const.UnreservedChars.IndexOf(ch) != -1)
-                    stringBuilder.Append(ch);
-                else
-                    stringBuilder.Append('%' + $"{(int)ch:X2}");
-            }
-            return stringBuilder.ToString();
-        }
-        private static string GenerateNonce()
-        {
-            return new Random().Next(123400, 9999999).ToString();
-        }
-        private static string NormalizeRequestParameters(IList<QueryParameter> parameters)
-        {
-            var stringBuilder = new StringBuilder();
-            for (var index = 0; index < parameters.Count; ++index)
-            {
-                var parameter = parameters[index];
-                stringBuilder.AppendFormat("{0}={1}", parameter.Name, parameter.Value);
-                if (index < parameters.Count - 1)
-                    stringBuilder.Append("&");
-            }
-            return stringBuilder.ToString();
-        }
-        private List<QueryParameter> GetQueryParameters(string parameters)
-        {
-            if (parameters.StartsWith("?"))
-                parameters = parameters.Remove(0, 1);
-            var queryParameterList = new List<QueryParameter>();
-            if (string.IsNullOrEmpty(parameters)) return queryParameterList;
-            var str = parameters;
-            var chArray = new[] { '&' };
-            foreach (var name in str.Split(chArray))
-            {
-                if (string.IsNullOrEmpty(name) || name.StartsWith("oauth_")) continue;
-                if (name.IndexOf('=') > -1)
-                {
-                    var strArray = name.Split('=');
-                    queryParameterList.Add(new QueryParameter(strArray[0], strArray[1]));
-                }
-                else
-                    queryParameterList.Add(new QueryParameter(name, string.Empty));
-            }
-            return queryParameterList;
-        }
-        private class QueryParameter
-        {
-            public string Name { get; }
+            var uriBuilder = new UriBuilder(_authorizeUrl);
+            var ListQueryString = urlService.ParseQueryString(uriBuilder.Query);
 
-            public string Value { get; }
-
-            public QueryParameter(string name, string value)
+            var form = new Dictionary<string, string>
             {
-                Name = name;
-                Value = value;
+                {CsrfState, textService.GenerateNonce()},
+                {RedirectUri, urlService.UrlEncode(_callBackUrl)},
+                {ResponseType, ResponseTypeValue},
+                {ClientId, _apiKey},
+            };
+            ListQueryString.AddRange(form.Select(x => new Parameters() { Name = x.Key, Value = x.Value }).ToList());
+            uriBuilder.Query = urlService.QueryBuilder(ListQueryString);
+
+            return uriBuilder.Uri.AbsoluteUri;
+        }
+
+        public IYahooToken Authorize(string CsrfState)
+        {
+            ITokenRequest tokenRequest = new TokenRequest()
+            {
+                ClientId = _apiKey,
+                ClientSecret = _apiSecret,
+                Code = QueryString[AuthCode],
+                GrantType = GrantTypeValue,
+                RedirectUri = _callBackUrl.Replace(new Uri(_callBackUrl).Query, string.Empty),
+                BaseUri = _accessTockenUrl,
+                BasicXAuthCode = authService.GenerateBasicAuthWithHeader(new BasicAuthInput() { UserName = _apiKey, Password = _apiSecret }),
+                CsrfState = CsrfState,
+                QueryString = QueryString,
+            };
+            
+            HttpResponseMessage tokenResponse = Service.GetAccessToken(tokenRequest);
+
+            var ReadContent = Task.Run(() => tokenResponse.Content.ReadAsStringAsync()).ConfigureAwait(false);
+            var jsonContent = ReadContent.GetAwaiter().GetResult();
+            if (tokenResponse.StatusCode != HttpStatusCode.OK)
+            {
+                var JsonObj = new JObject
+                {
+                    { nameof(Error), JObject.Parse(jsonContent) }
+                };
+                jsonContent = JsonObj.ToString();
             }
+            IYahooToken token = JsonConvert.DeserializeObject<YahooToken>(jsonContent);
+            return token;
+        }
+
+        public IYahooUser GetUser(IToken token)
+        {
+            IYahooUser user = JsonConvert.DeserializeObject<YahooUser>(GetUserJson(token));
+            user.AuthRouter = nameof(AuthRouter.Yahoo);
+            user.AccessToken = token.AccessToken;
+            return user;
+        }
+
+        public string GetUserJson(IToken token)
+        {
+            IHttpResponseInput httpResponseInput = new HttpResponseInput()
+            {
+                BaseUri = _userJsonUrl,
+                XAuthHeader = authService.ConstructBearerAuth(token.AccessToken),
+            };
+
+            return Service.GetUserJson(token, httpResponseInput);
         }
     }
 }

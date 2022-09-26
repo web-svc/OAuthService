@@ -49,6 +49,14 @@
             "Newtonsoft.Json": {
               "target": "Package",
               "version": "[13.0.1, )"
+            },
+            "WebSvc.CryptoService": {
+              "target": "Package",
+              "version": "[1.1.1, )"
+            },
+            "WebSvc.Helper": {
+              "target": "Package",
+              "version": "[1.1.9, )"
             }
           },
           "imports": [

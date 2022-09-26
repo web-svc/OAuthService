@@ -10,6 +10,24 @@
         "runtime": {
           "lib/netstandard2.0/Newtonsoft.Json.dll": {}
         }
+      },
+      "WebSvc.CryptoService/1.1.1": {
+        "type": "package",
+        "compile": {
+          "lib/netcoreapp3.1/CryptoService.dll": {}
+        },
+        "runtime": {
+          "lib/netcoreapp3.1/CryptoService.dll": {}
+        }
+      },
+      "WebSvc.Helper/1.1.9": {
+        "type": "package",
+        "compile": {
+          "lib/netcoreapp3.1/Helper.dll": {}
+        },
+        "runtime": {
+          "lib/netcoreapp3.1/Helper.dll": {}
+        }
       }
     }
   },
@@ -40,11 +58,39 @@
         "newtonsoft.json.nuspec",
         "packageIcon.png"
       ]
+    },
+    "WebSvc.CryptoService/1.1.1": {
+      "sha512": "gpyLKFe6wY7+fnpXKAYy893Z+SkjODibEu2v8TOqwOrQbeTnWLx2QhwG/qFge7G8JJpaJ8G6uViftU7ZRshhdw==",
+      "type": "package",
+      "path": "websvc.cryptoservice/1.1.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "EULA.txt",
+        "lib/netcoreapp3.1/CryptoService.dll",
+        "websvc.cryptoservice.1.1.1.nupkg.sha512",
+        "websvc.cryptoservice.nuspec"
+      ]
+    },
+    "WebSvc.Helper/1.1.9": {
+      "sha512": "6Y7U9FNKrTJBkvUxbiTfWlfqlKkcyNdM3I+K5whpHjNNfXbSXqDkxOcFxhUcPgSjHDwYwOwOMUN+HcehoCo48A==",
+      "type": "package",
+      "path": "websvc.helper/1.1.9",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "EULA.txt",
+        "lib/netcoreapp3.1/Helper.dll",
+        "websvc.helper.1.1.9.nupkg.sha512",
+        "websvc.helper.nuspec"
+      ]
     }
   },
   "projectFileDependencyGroups": {
     ".NETCoreApp,Version=v3.1": [
-      "Newtonsoft.Json >= 13.0.1"
+      "Newtonsoft.Json >= 13.0.1",
+      "WebSvc.CryptoService >= 1.1.1",
+      "WebSvc.Helper >= 1.1.9"
     ]
   },
   "packageFolders": {
@@ -98,6 +144,14 @@
           "Newtonsoft.Json": {
             "target": "Package",
             "version": "[13.0.1, )"
+          },
+          "WebSvc.CryptoService": {
+            "target": "Package",
+            "version": "[1.1.1, )"
+          },
+          "WebSvc.Helper": {
+            "target": "Package",
+            "version": "[1.1.9, )"
           }
         },
         "imports": [

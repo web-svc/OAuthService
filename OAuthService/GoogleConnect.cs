@@ -1,28 +1,45 @@
-﻿using Newtonsoft.Json;
-using OAuthService.Constant;
-using OAuthService.Extentsion;
-using OAuthService.Model;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Web;
-
-namespace OAuthService
+﻿namespace OAuthService
 {
+    using CryptoService;
+    using CryptoService.Interface;
+    using CryptoService.Model;
+    using Helper;
+    using Helper.Extentsion;
+    using Helper.Interface;
+    using Helper.Model;
+    using Newtonsoft.Json;
+    using Newtonsoft.Json.Linq;
+    using OAuthService.Constant;
+    using OAuthService.Interface;
+    using OAuthService.Interface.Google;
+    using OAuthService.Model;
+    using OAuthService.Model.Google;
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Specialized;
+    using System.Linq;
+    using System.Net;
+    using System.Net.Http;
+    using System.Threading.Tasks;
+    using System.Web;
+    using static OAuthService.Constant.Const;
+    using static OAuthService.Constant.Enum;
+
     public class GoogleConnect
     {
         private readonly string _apiKey;
         private readonly string _apiSecret;
-        private string _callBackUrl;
+        private static string _callBackUrl;
         private string _scope;
         private string _authorizeUrl;
         private string _accessTockenUrl;
         private string _userJsonUrl;
         static NameValueCollection QueryString = HttpUtility.ParseQueryString(string.Empty);
-        public GoogleConnect(string consumerKey, string consumerSecret, string scope = "https://www.googleapis.com/auth/plus.login  https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile", string authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth", string accessTockenUrl = "https://www.googleapis.com/oauth2/v4/token", string userJsonUrl = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json")
+        readonly ITextService textService = new TextService();
+        readonly IUrlService urlService = new UrlService();
+        readonly IAuthService authService = new AuthService();
+
+        public GoogleConnect(string consumerKey, string consumerSecret, string callbackUrl, string scope = "https://www.googleapis.com/auth/plus.login  https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile", string authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth", string accessTockenUrl = "https://oauth2.googleapis.com/token", string userJsonUrl = "https://www.googleapis.com/oauth2/v2/userinfo")
         {
             _apiKey = consumerKey;
             _apiSecret = consumerSecret;
@@ -30,183 +47,83 @@ namespace OAuthService
             _authorizeUrl = authorizeUrl;
             _accessTockenUrl = accessTockenUrl;
             _userJsonUrl = userJsonUrl;
+            _callBackUrl = callbackUrl;
+            QueryString = HttpUtility.ParseQueryString(new Uri(_callBackUrl).Query);
         }
-        public static bool IsAuthorized => QueryString["code"].IsEmpty();
-        public static bool IsDenied => QueryString["error"].IsEmpty();
-        public void Authentication(string callBackUrl)
+        
+        public static bool IsAuthorized => !QueryString[Const.AuthCode].IsEmpty();
+        
+        public static bool IsDenied => !QueryString[Const.Error].IsEmpty();
+        
+        public string GetAuthenticationUrl()
         {
-            _callBackUrl = callBackUrl; //HttpContext.Current.Response.Redirect(AuthenticationUrl);
-        }
-        private string AuthenticationUrl
-        {
-            get
-            {
-                var uriBuilder = new UriBuilder(_authorizeUrl);
-                var queryString = HttpUtility.ParseQueryString(uriBuilder.Query);
-                App.XOAUTH_Guid = GenerateNonce();
-                //HttpContext.Current.Session.Add("csrf_state", App.XOAUTH_Guid);
-                var queryParameters = GetQueryParameters(uriBuilder.Query);
-                queryParameters.Add(new QueryParameter("scope", UrlEncode(_scope)));
-                queryParameters.Add(new QueryParameter("access_type", Const.GoogleAccessType));
-                queryParameters.Add(new QueryParameter("state", App.XOAUTH_Guid));
-                queryParameters.Add(new QueryParameter("redirect_uri", _callBackUrl));
-                queryParameters.Add(new QueryParameter("response_type", Const.ResponseType));
-                queryParameters.Add(new QueryParameter("client_id", _apiKey));
-                uriBuilder.Query = NormalizeRequestParameters(queryParameters);
-                return uriBuilder.Uri.AbsoluteUri;
-            }
-        }
-        public void Authorize(string callBackUrl)
-        {
-            _callBackUrl = callBackUrl; AccessTokenGet(QueryString["code"], QueryString["state"]);
-            if (App.TokenSecret.Length <= 0)
-                throw new Exception("Invalid Google token.");
-        }
-        private void AccessTokenGet(string authToken, string oauthVerifier)
-        {
-            App.Token = authToken;
-            App.OAuthVerifier = oauthVerifier;
-            //if (HttpContext.Current.Session["csrf_state"] == null || !HttpContext.Current.Session["csrf_state"].Equals(oauthVerifier))
-            //    throw new Exception("auth data data has been tempered but you are safe.");
-            var uriBuilder = new UriBuilder(_accessTockenUrl);
-            var queryString = HttpUtility.ParseQueryString(uriBuilder.Query);
-            var queryParameters = GetQueryParameters(uriBuilder.Query);
-            queryParameters.Add(new QueryParameter("code", UrlEncode(App.Token)));
-            queryParameters.Add(new QueryParameter("client_id", _apiKey));
-            queryParameters.Add(new QueryParameter("client_secret", _apiSecret));
-            queryParameters.Add(new QueryParameter("redirect_uri", UrlEncode(_callBackUrl)));
-            queryParameters.Add(new QueryParameter("grant_type", Const.GrantType));
-            var query = NormalizeRequestParameters(queryParameters);
-            App.TokenSecret = JsonConvert.DeserializeObject<dynamic>(WebRequest(Method.POST, uriBuilder.Uri.AbsoluteUri, query))["access_token"].ToString();
-        }
-        private string WebRequest(Method method, string url, string postData)
-        {
-            var webRequest = System.Net.WebRequest.Create(url) as HttpWebRequest;
-            if (webRequest == null) return null;
-            webRequest.Method = method.ToString();
-            webRequest.ServicePoint.Expect100Continue = false;
-            if (method == Method.POST || method == Method.DELETE)
-            {
-                webRequest.Headers.Add(AuthorizationHeader);
-                webRequest.ContentType = "application/x-www-form-urlencoded";
-                var streamWriter2 = new StreamWriter(webRequest.GetRequestStream());
-                try
-                {
-                    streamWriter2.Write(postData);
-                }
-                finally
-                {
-                    streamWriter2.Close();
-                }
-            }
-            var str = WebResponseGet(webRequest);
-            return str;
-        }
-        private string AuthorizationHeader
-        {
-            get
-            {
-                return "Authorization: Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(_apiKey + ":" + _apiSecret));
-            }
-        }
-        private string AuthorizedHeader
-        {
-            get
-            {
-                return "Authorization: Bearer " + App.TokenSecret;
-            }
-        }
-        public User FetchProfile()
-        {
-            var userJson = JsonConvert.DeserializeObject<dynamic>(GetAuthRequest(Method.GET, _userJsonUrl, AuthorizedHeader));
-            if (userJson == null) { throw new Exception("? OAuth Token not received. Please retry or get in touch with support team."); }
-            if (userJson.ContainsKey("email") == false) { throw new Exception("we could not fetch your email address from OAuth Token. Please make sure that your profile is up to date with email address."); }
-            return new User { Email = userJson["email"], Name = userJson["name"], Token = App.TokenSecret, AuthRouter = "Google" };
-        }
-        private static string GetAuthRequest(Method method, string url, string postData)
-        {
-            var webRequest = System.Net.WebRequest.Create(url) as HttpWebRequest;
-            if (webRequest == null) return null;
-            webRequest.Method = method.ToString();
-            if (postData.Length > 0)
-            {
-                webRequest.Headers.Add(postData);
-                webRequest.KeepAlive = true;
-            }
-            var str = WebResponseGet(webRequest);
-            return str;
-        }
-        private static string WebResponseGet(HttpWebRequest webRequest)
-        {
-            var stream = webRequest.GetResponse().GetResponseStream();
-            return stream == null ? null : new StreamReader(stream).ReadToEnd();
-        }
-        private enum Method
-        {
-            GET,
-            POST,
-            DELETE,
-        }
-        private static string UrlEncode(string value)
-        {
-            var stringBuilder = new StringBuilder();
-            foreach (var ch in value)
-            {
-                if (Const.UnreservedChars.IndexOf(ch) != -1)
-                    stringBuilder.Append(ch);
-                else
-                    stringBuilder.Append('%' + $"{(int)ch:X2}");
-            }
-            return stringBuilder.ToString();
-        }
-        private static string GenerateNonce()
-        {
-            return new Random().Next(123400, 9999999).ToString();
-        }
-        private static string NormalizeRequestParameters(IList<QueryParameter> parameters)
-        {
-            var stringBuilder = new StringBuilder();
-            for (var index = 0; index < parameters.Count; ++index)
-            {
-                var parameter = parameters[index];
-                stringBuilder.AppendFormat("{0}={1}", parameter.Name, parameter.Value);
-                if (index < parameters.Count - 1)
-                    stringBuilder.Append("&");
-            }
-            return stringBuilder.ToString();
-        }
-        private List<QueryParameter> GetQueryParameters(string parameters)
-        {
-            if (parameters.StartsWith("?"))
-                parameters = parameters.Remove(0, 1);
-            var queryParameterList = new List<QueryParameter>();
-            if (string.IsNullOrEmpty(parameters)) return queryParameterList;
-            var str = parameters;
-            var chArray = new[] { '&' };
-            foreach (var name in str.Split(chArray))
-            {
-                if (string.IsNullOrEmpty(name) || name.StartsWith("oauth_")) continue;
-                if (name.IndexOf('=') > -1)
-                {
-                    var strArray = name.Split('=');
-                    queryParameterList.Add(new QueryParameter(strArray[0], strArray[1]));
-                }
-                else
-                    queryParameterList.Add(new QueryParameter(name, string.Empty));
-            }
-            return queryParameterList;
-        }
-        private class QueryParameter
-        {
-            public string Name { get; }
+            var uriBuilder = new UriBuilder(_authorizeUrl);
 
-            public string Value { get; }
-
-            public QueryParameter(string name, string value)
+            var ListQueryString = urlService.ParseQueryString(uriBuilder.Query);
+            var form = new Dictionary<string, string>
             {
-                Name = name;
-                Value = value;
+                {Scope, urlService.UrlEncode(_scope)},
+                {AccessType, AccessTypeValue},
+                {CsrfState, textService.GenerateNonce()},
+                {RedirectUri, _callBackUrl},
+                {ResponseType, ResponseTypeValue},
+                {ClientId, _apiKey},
+            };
+            ListQueryString.AddRange(form.Select(x => new Parameters() { Name = x.Key, Value = x.Value }).ToList());
+            uriBuilder.Query = urlService.QueryBuilder(ListQueryString);
+
+            return uriBuilder.Uri.AbsoluteUri;
+        }
+
+        public IGoogleToken Authorize(string CsrfState)
+        {
+            ITokenRequest tokenRequest = new TokenRequest()
+            {
+                ClientId = _apiKey,
+                ClientSecret = _apiSecret,
+                Code = QueryString[AuthCode],
+                GrantType = GrantTypeValue,
+                RedirectUri = _callBackUrl.Replace(new Uri(_callBackUrl).Query, string.Empty),
+                BaseUri = _accessTockenUrl,
+                BasicXAuthCode = authService.GenerateBasicAuthWithHeader(new BasicAuthInput() { UserName = _apiKey, Password = _apiSecret }),
+                CsrfState = CsrfState,
+                QueryString = QueryString,
+            };
+            
+            HttpResponseMessage tokenResponse = Service.GetAccessToken(tokenRequest);
+
+            var ReadContent = Task.Run(() => tokenResponse.Content.ReadAsStringAsync()).ConfigureAwait(false);
+            var jsonContent = ReadContent.GetAwaiter().GetResult();
+            if (tokenResponse.StatusCode != HttpStatusCode.OK)
+            {
+                var JsonObj = new JObject
+                {
+                    { nameof(Error), JObject.Parse(jsonContent) }
+                };
+                jsonContent = JsonObj.ToString();
             }
+            IGoogleToken token = JsonConvert.DeserializeObject<GoogleToken>(jsonContent);
+            return token;
+        }
+
+        public IGoogleUser GetUser(IToken token)
+        {
+            IGoogleUser user = JsonConvert.DeserializeObject<GoogleUser>(GetUserJson(token));
+
+            user.AuthRouter = nameof(AuthRouter.Google);
+            user.AccessToken = token.AccessToken;
+            return user;
+        }
+
+        public string GetUserJson(IToken token)
+        {
+            IHttpResponseInput httpResponseInput = new HttpResponseInput()
+            {
+                BaseUri = _userJsonUrl,
+                XAuthHeader = authService.ConstructBearerAuth(token.AccessToken),
+            };
+
+            return Service.GetUserJson(token, httpResponseInput);
         }
     }
 }

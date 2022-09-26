@@ -7,3 +7,4 @@ C:\git\OAuthService\OAuthService\bin\Debug\netcoreapp3.1\OAuthService.dll
 C:\git\OAuthService\OAuthService\bin\Debug\netcoreapp3.1\OAuthService.pdb
 C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.dll
 C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.pdb
+C:\git\OAuthService\OAuthService\obj\Debug\netcoreapp3.1\OAuthService.csproj.AssemblyReference.cache

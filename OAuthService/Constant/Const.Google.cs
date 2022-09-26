@@ -2,6 +2,7 @@
 {
     internal partial class Const
     {
-        internal const string GoogleAccessType = "offline";
+        internal const string AccessTypeValue = "offline";
+        internal const string AccessType = "access_type";
     }
 }
